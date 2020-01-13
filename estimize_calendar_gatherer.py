@@ -94,12 +94,9 @@ class calendar(Process):
         revenue_df['Symbol'] = tickers
         revenue_df = revenue_df.iloc[:, [2,3,5,6,7,8,9,10,12]]
         revenue_df.columns = ['Date Reported', 'Num of Estimates', 'Delta', 'Surprise', 'Historical Beat Rate', 'Wall St', 'Estimize', 'Actual', 'Symbol']
-        print(eps_df)
+
 
         # store in the database
-        #print(eps_df)
-        #print(revenue_df)
-        #print()
         eps_df.to_sql('estimize_eps', self.conn, if_exists='append', index=False)
         revenue_df.to_sql('estimize_revenue', self.conn, if_exists='append', index=False)
 

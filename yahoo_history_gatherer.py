@@ -27,9 +27,10 @@ class yahoo_gather():
                 symbol = symbol[0]
                 df = data[symbol]
                 df['Symbol'] = symbol
+                df = df.dropna()
                 print(df)
 
                 # store in the database
-                df.to_sql('price_history_2', self.conn, if_exists='append')
+                df.to_sql('price_history', self.conn, if_exists='append')
 
 yahoo_gather()

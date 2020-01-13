@@ -10,12 +10,13 @@ class aggregator():
     def __init__(self):
         conn = sqlite3.connect('earnings.db', timeout=120)
         cur = conn.cursor()
-        symbol = 'BBY'
-        self.eps_df = pd.read_sql('select * from estimize_eps where Symbol == "%s"' % symbol, conn)
-        self.revenue_df = pd.read_sql('select * from estimize_revenue where Symbol == "%s"' % symbol, conn)
-        self.history_df = pd.read_sql('select * from price_history_2 where Symbol == "%s"' % symbol, conn)
+        #symbol = 'BBY'
+        self.eps_df = pd.read_sql('select * from estimize_eps', conn)
+        self.revenue_df = pd.read_sql('select * from estimize_revenue', conn)
+        self.history_df = pd.read_sql('select * from price_history', conn)
 
-        self.spy_history_df = pd.read_sql('select * from price_history_2 where Symbol == "%s"' % 'SPY', conn)
+        self.spy_history_df = pd.read_sql('select * from price_history where Symbol == "%s"' % 'SPY', conn)
+
 
         self.get_combined_df()
         self.get_price_changes()
@@ -25,7 +26,8 @@ class aggregator():
         self.get_YoY_growth()
         self.get_market_cap()
 
-        self.df[self.df.index.get_level_values('Symbol')==symbol].to_csv('earnings_df.csv')
+
+        #self.df[self.df.index.get_level_values('Symbol')==symbol].to_csv('earnings_df.csv')
         #this_history[this_history['Symbol']==symbol].to_csv('history_df.csv')
 
 
@@ -78,27 +80,29 @@ class aggregator():
             this_history['Open to Close 10 Days'] = (this_history['Close'] / this_history['Open'].shift(9) - 1)
 
 
+            try:
+                if 'BMO' in time_reported:
+                    percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
+                    spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
+                    self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change')] = percent_change
+                    self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change Abnormal')] = percent_change - spy_percent_change
 
-            if 'BMO' in time_reported:
-                percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
-                spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
-                self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change')] = percent_change
-                self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change Abnormal')] = percent_change - spy_percent_change
+                    percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
+                    spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
+                    self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change')] = percent_change
+                    self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change Abnormal')] = percent_change - spy_percent_change
+                else:
+                    percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
+                    spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
+                    self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change')] = percent_change
+                    self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change Abnormal')] = percent_change - spy_percent_change
 
-                percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
-                spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
-                self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change')] = percent_change
-                self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change Abnormal')] = percent_change - spy_percent_change
-            else:
-                percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
-                spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
-                self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change')] = percent_change
-                self.df.iloc[index_num, self.df.columns.get_loc('5 Day Change Abnormal')] = percent_change - spy_percent_change
-
-                percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
-                spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
-                self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change')] = percent_change
-                self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change Abnormal')] = percent_change - spy_percent_change
+                    percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
+                    spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
+                    self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change')] = percent_change
+                    self.df.iloc[index_num, self.df.columns.get_loc('10 Day Change Abnormal')] = percent_change - spy_percent_change
+            except:
+                pass
 
             # TODO: Buy before announcement price changes
         print(self.df)
@@ -160,8 +164,6 @@ class aggregator():
                 this_quarter = this_df[this_df.index.get_level_values('Time Reported') == quarter_numer + " '" + year].values[0]
                 last_quarter = this_df[this_df.index.get_level_values('Time Reported') == quarter_numer + " '" + str(int(year)-1)].values[0]
             except Exception as e:
-                print(e)
-                input()
                 pass
 
 
