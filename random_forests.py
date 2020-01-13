@@ -13,9 +13,16 @@ df.head()
 train, test = df[df['is_train']==True], df[df['is_train']==False]
 
 features = df.columns[:4]
-clf = RandomForestClassifier(n_jobs=-1)
+clf = RandomForestClassifier(n_jobs=2)
 y, _ = pd.factorize(train['species'])
 clf.fit(train[features], y)
 
+# View the predicted probabilities of the first 10 observations
+clf.predict_proba(test[features])[0:10]
+
 preds = iris.target_names[clf.predict(test[features])]
 print(pd.crosstab(test['species'], preds, rownames=['actual'], colnames=['preds']))
+
+# View a list of the features and their importance scores
+print(list(zip(train[features], clf.feature_importances_)))
+print(clf.feature_importances_)
