@@ -5,6 +5,9 @@ import multitasking
 import time
 import numpy as np
 import re
+import requests as r
+from bs4 import BeautifulSoup
+import requests_cache
 #multitasking.set_engine("process")
 
 import warnings
@@ -81,10 +84,8 @@ def aggregator(symbol):
         for index, row in df.iterrows():
             index_num, date_reported, time_reported, symbol = index
 
-            this_history = history_df[history_df['Symbol'] == symbol]
-            this_history['Open to Close 5 Days'] = (this_history['Close'] / this_history['Open'].shift(4) - 1)
-            this_history['Open to Close 10 Days'] = (this_history['Close'] / this_history['Open'].shift(9) - 1)
-
+            history_df['Open to Close 5 Days'] = (history_df['Close'] / history_df['Open'].shift(4) - 1)
+            history_df['Open to Close 10 Days'] = (history_df['Close'] / history_df['Open'].shift(9) - 1)
 
             try:
                 if 'BMO' in time_reported:
@@ -118,18 +119,13 @@ def aggregator(symbol):
             index_num, date_reported, time_reported, symbol = index
 
             this_df = df[df.index.get_level_values('Symbol')==symbol]
-            beat_rate = this_df[this_df.index.get_level_values('Date Reported') < date_reported].tail(8)
+            beat_rate = this_df[this_df.index.get_level_values('Date Reported') <= date_reported].tail(8)
 
-            if len(beat_rate)<4:
-                beat_rate_percent = None
-                beat_rate_ratio = None
-            else:
-
+            if len(beat_rate)>=4:
                 beat_rate_ratio = len(beat_rate[beat_rate['EPS Surprise'] > 0]) / float(len(beat_rate))
                 beat_rate_percent = beat_rate['EPS Surprise'] / beat_rate['EPS Actual']
                 beat_rate_percent = beat_rate_percent.replace([np.inf, -np.inf], np.nan)
                 beat_rate_percent = beat_rate_percent.mean()
-
 
             # TODO: Do the same for revenue
             df.loc[index_num, ['Historical EPS Beat Ratio']] = beat_rate_ratio
@@ -144,8 +140,7 @@ def aggregator(symbol):
         for index, row in df.iterrows():
             index_num, date_reported, time_reported, symbol = index
 
-            this_df = df[df.index.get_level_values('Symbol')==symbol]
-            returns_df = this_df[this_df.index.get_level_values('Date Reported') < date_reported].tail(8)
+            returns_df = df[df.index.get_level_values('Date Reported') < date_reported].tail(8)
 
             if len(returns_df)>=4:
                 df.loc[index_num, ['Average Change 5 Days']] = returns_df['5 Day Change'].mean()
@@ -171,7 +166,32 @@ def aggregator(symbol):
 
 
     def get_market_cap():
-        pass
+        finviz_page = r.get('https://finviz.com/quote.ashx?t=%s' % symbol)
+
+        soup = BeautifulSoup(finviz_page.text, features='lxml')
+        table_row = soup.findAll('tr', attrs={'class': "table-dark-row"})[1]
+        market_cap = table_row.text.replace('Market Cap','').split('\n')[1]
+        if 'K' in market_cap:
+            market_cap = float(market_cap[:-1])*1000
+        elif 'M' in market_cap:
+            market_cap = float(market_cap[:-1])*1000000
+        elif 'B' in market_cap:
+            market_cap = float(market_cap[:-1])*1000000000
+
+        market_cap = int(market_cap)
+        if market_cap > 10000000000:
+            market_cap_text = 'Large'
+        elif market_cap > 2000000000:
+            market_cap_text = 'Medium'
+        elif market_cap > 300000000:
+            market_cap_text = 'Small'
+        else:
+            market_cap_text = 'Micro'
+
+        df['Market Cap Text'] = market_cap_text
+
+
+
     start_time = time.time()
     conn = sqlite3.connect('earnings.db', timeout=120)
     cur = conn.cursor()
@@ -183,15 +203,13 @@ def aggregator(symbol):
 
     df = get_combined_df(eps_df, revenue_df)
 
-    get_price_changes(df, history_df, spy_history_df)
-
     get_historical_beat()
-    get_average_change()
-    get_YoY_growth()
     get_market_cap()
+    get_YoY_growth()
+    get_price_changes(df, history_df, spy_history_df)
+    get_average_change()
 
-    df.to_sql('aggregated_data_verified', conn, if_exists='append')
-
+    df.to_sql('aggregated_data_verified', conn, if_exists='replace')
     print((time.time()-start_time)*2921)
 
 if __name__ == '__main__':
@@ -201,12 +219,7 @@ if __name__ == '__main__':
     symbols = pd.read_sql('select DISTINCT symbol from estimize_eps;', conn)
     symbols = symbols.values.tolist()
 
-    """
     for symbol in symbols:
         aggregator(symbol[0])
-    """
-    aggregator('NEOG')
 
-
-
-    #aggregator('BBY')
+    #aggregator('NEOG')
