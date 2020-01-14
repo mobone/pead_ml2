@@ -26,6 +26,8 @@ class aggregator():
         self.get_YoY_growth()
         self.get_market_cap()
 
+        self.df.to_sql('aggregated_data', conn, if_exists='replace')
+
 
         #self.df[self.df.index.get_level_values('Symbol')==symbol].to_csv('earnings_df.csv')
         #this_history[this_history['Symbol']==symbol].to_csv('history_df.csv')

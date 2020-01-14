@@ -18,6 +18,7 @@ from random import shuffle
 
 # TODO: !!! Change to yearly instead of daily
 # https://www.estimize.com/calendar?tab=equity&startDate=2019-01-01&endDate=2019-12-31
+# ensure index matches datetime sorting
 
 class calendar(Process):
     def __init__(self, date_queue, lock):
