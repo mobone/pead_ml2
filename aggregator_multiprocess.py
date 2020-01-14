@@ -127,9 +127,9 @@ def aggregator(symbol):
                 beat_rate_percent = beat_rate_percent.replace([np.inf, -np.inf], np.nan)
                 beat_rate_percent = beat_rate_percent.mean()
 
-            # TODO: Do the same for revenue
-            df.loc[index_num, ['Historical EPS Beat Ratio']] = beat_rate_ratio
-            df.loc[index_num, ['Historical EPS Beat Percent']] = beat_rate_percent
+                # TODO: Do the same for revenue
+                df.loc[index_num, ['Historical EPS Beat Ratio']] = beat_rate_ratio
+                df.loc[index_num, ['Historical EPS Beat Percent']] = beat_rate_percent
 
 
     def get_average_change():
@@ -185,17 +185,17 @@ def aggregator(symbol):
             market_cap_text = 'Medium'
         elif market_cap > 300000000:
             market_cap_text = 'Small'
-        else:
+        elif market_cap > 50000000:
             market_cap_text = 'Micro'
+        else:
+            market_cap_text = 'Nano'
 
         df['Market Cap Text'] = market_cap_text
-
 
 
     start_time = time.time()
     conn = sqlite3.connect('earnings.db', timeout=120)
     cur = conn.cursor()
-    #symbol = 'BBY'
 
     eps_df = total_eps_df[total_eps_df['Symbol'] == symbol]
     revenue_df = total_revenue_df[total_revenue_df['Symbol'] == symbol]
@@ -209,15 +209,21 @@ def aggregator(symbol):
     get_price_changes(df, history_df, spy_history_df)
     get_average_change()
 
-    df.to_sql('aggregated_data_verified', conn, if_exists='replace')
+    df.to_sql('aggregated_data', conn, if_exists='append')
     print((time.time()-start_time)*2921)
 
 if __name__ == '__main__':
 
 
     conn = sqlite3.connect('earnings.db', timeout=120)
+    cur = conn.cursor()
     symbols = pd.read_sql('select DISTINCT symbol from estimize_eps;', conn)
     symbols = symbols.values.tolist()
+    try:
+        query = 'drop table aggregated_data'
+        cur.execute(query)
+    except:
+        pass
 
     for symbol in symbols:
         aggregator(symbol[0])
