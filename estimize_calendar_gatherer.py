@@ -52,10 +52,6 @@ class calendar(Process):
         if '0 Events' == companies_reporting_div.text.split('\n')[1]:
             return
 
-        # check if earnings already in database
-        symbol_href = self.driver.find_element_by_class_name('lfkTWp')
-        symbol = symbol_href.text
-
         report_date = self.driver.find_element_by_class_name('dybmdC')
         report_date = report_date.text.replace('\n', '')
 
