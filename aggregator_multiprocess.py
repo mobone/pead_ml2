@@ -8,9 +8,10 @@ import re
 import requests as r
 from bs4 import BeautifulSoup
 import requests_cache
-#multitasking.set_engine("process")
-
 import warnings
+
+requests_cache.install_cache('finviz_cache')
+
 warnings.filterwarnings('ignore')
 
 pd.set_option('display.max_rows', 500)
