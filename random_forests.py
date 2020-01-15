@@ -20,75 +20,70 @@ print(df)
 max_accuracy = 0
 max_correct = 0
 max_mean_return = 0
-while True:
-    #df['is_train'] = np.random.uniform(0, 1, len(df)) <= .75
 
-    df['is_train'] = True
+class ml():
+    def __init__(self, df, buy_cutoff):
+        features = ['EPS Num of Estimates', 'EPS Delta', 'EPS Surprise', 'EPS Wall St',
+               'EPS Estimize', 'EPS Actual', 'Revenue Num of Estimates',
+               'Revenue Delta', 'Revenue Surprise', 'Revenue Wall St',
+               'Revenue Estimize', 'Revenue Actual',
+               'Historical EPS Beat Ratio', 'Historical EPS Beat Percent',
+               'Average Change 5 Days', 'Average Abnormal Change 5 Days', 'Average Change 10 Days', 'Average Abnormal Change 10 Days',
+               'YoY Growth']
 
-    #df[df['Date Reported']>]['is_train'] = False
-    df['is_train'].values[df['Date Reported'] >=datetime.strptime('2019-01-01', '%Y-%m-%d')] = False
+        train, test = self.prepare_data(df, buy_cutoff)
+        self.train(train, features)
+        self.predict(test, features)
+        self.get_results(test)
 
+    def prepare_data(self, df, buy_cutoff):
+        df['is_train'] = True
+        #df['is_train'] = np.random.uniform(0, 1, len(df)) <= .75
+        df['is_train'].values[df['Date Reported'] >=datetime.strptime('2019-01-01', '%Y-%m-%d')] = False
 
-    #print(df)
-    buy_cutoff = round(random.uniform(.02, .08),2)
-    df['Action'] = 0
-    df['Action'].values[df['10 Day Change Abnormal'].values > random.uniform(.02, .08)] = 1
-    df['Action'] = df['Action'].astype('category')
+        df['Action'] = 'Buy'
+        df['Action'].values[df['10 Day Change Abnormal'].values > buy_cutoff] = "Don't Buy"
+        df['Action'] = df['Action'].astype('category')
 
-    #print(df.head())
+        train, test = df[df['is_train']==True], df[df['is_train']==False]
 
-    train, test = df[df['is_train']==True], df[df['is_train']==False]
+        return train, test
 
-    """features = ['EPS Num of Estimates', 'EPS Delta', 'EPS Surprise', 'EPS Wall St',
-           'EPS Estimize', 'EPS Actual', 'Revenue Num of Estimates',
-           'Revenue Delta', 'Revenue Surprise', 'Revenue Wall St',
-           'Revenue Estimize', 'Revenue Actual',
-           'Historical EPS Beat Ratio', 'Historical EPS Beat Percent',
-           'Average Change 5 Days', 'Average Abnormal Change 5 Days', 'Average Change 10 Days', 'Average Abnormal Change 10 Days',
-           'YoY Growth']"""
+    def train(self, train, features):
+        self.clf = RandomForestClassifier(n_jobs=-1)
+        y, _ = pd.factorize(train['Action'])
+        clf.fit(train[features], y)
 
-    features = ['EPS Surprise', 'EPS Wall St',
-           'EPS Estimize', 'EPS Actual',
-           'Revenue Delta', 'Revenue Surprise', 'Revenue Wall St',
-           'Revenue Estimize', 'Revenue Actual',
-           'Historical EPS Beat Percent',
-           'Average Change 5 Days', 'Average Abnormal Change 5 Days', 'Average Change 10 Days', 'Average Abnormal Change 10 Days',
-           'YoY Growth']
+    def predict(self, test, features):
+        preds = self.clf.predict(test[features])
+        test['Predicted'] = preds
 
+    def get_results(self, test):
+        # View a list of the features and their importance scores
+        feature_imp = pd.Series(self.clf.feature_importances_,index=features).sort_values(ascending=False)
 
-    clf = RandomForestClassifier(n_jobs=-1)
-    y, _ = pd.factorize(train['Action'])
-    clf.fit(train[features], y)
+        chosen = test[test['Predicted']==1]
+        actual_winners = chosen[chosen['10 Day Change Abnormal'] > .0]
+        accuracy = metrics.accuracy_score(test['Action'], test['Predicted'])
+        profitable_percent = len(actual_winners)/float(len(chosen))
+        mean_return = round(chosen['10 Day Change'].mean()*100,2)
 
-    # View the predicted probabilities of the first 10 observations
-    #print(clf.predict_proba(test[features])[0:10])
+        print(feature_imp)
+        print(chosen, actual_winners, accuracy, profitable_percent, mean_return)
+"""
+if (accuracy > max_accuracy or correct > max_correct) and mean_return>max_mean_return:
+    max_mean_return = mean_return
+    if accuracy > max_accuracy:
+        max_accuracy = accuracy
+    if correct > max_correct:
+        max_correct = correct
+    try:
+        test[['Date Reported', 'Action', 'Predicted', '10 Day Change', '10 Day Change Abnormal']].to_csv('predictions.csv')
+    except:
+        print('close excel')
+        input()
 
-    preds = clf.predict(test[features])
-    test['Predicted'] = preds
-
-
-
-    # View a list of the features and their importance scores
-    #print(list(zip(train[features], clf.feature_importances_)))
-    #print(clf.feature_importances_)
-    feature_imp = pd.Series(clf.feature_importances_,index=features).sort_values(ascending=False)
-    #print(feature_imp)
-    chosen = test[test['Predicted']==1]
-    actual_winners = chosen[chosen['10 Day Change Abnormal'] > .0]
-    accuracy = metrics.accuracy_score(test['Action'], test['Predicted'])
-    correct = len(actual_winners)/float(len(chosen))
-    mean_return = round(chosen['10 Day Change'].mean()*100,2)
-    if (accuracy > max_accuracy or correct > max_correct) and mean_return>max_mean_return:
-        max_mean_return = mean_return
-        if accuracy > max_accuracy:
-            max_accuracy = accuracy
-        if correct > max_correct:
-            max_correct = correct
-        try:
-            test[['Date Reported', 'Action', 'Predicted', '10 Day Change', '10 Day Change Abnormal']].to_csv('predictions.csv')
-        except:
-            print('close excel')
-            input()
-
-        print("Accuracy:", round(accuracy,2), "Correct Accuracy:", round(correct,2),"Mean Return:", mean_return, "Trades:", len(chosen), "Actual Winners:", len(actual_winners), 'Buy Cutoff:', buy_cutoff)
-        print(pd.crosstab(test['Action'], preds, rownames=['actual'], colnames=['preds']))
+    print("Accuracy:", round(accuracy,2), "Correct Accuracy:", round(correct,2),"Mean Return:", mean_return, "Trades:", len(chosen), "Actual Winners:", len(actual_winners), 'Buy Cutoff:', buy_cutoff)
+    print(pd.crosstab(test['Action'], preds, rownames=['actual'], colnames=['preds']))
+"""
+ml(df, .05)
