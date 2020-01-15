@@ -18,6 +18,10 @@ from random import shuffle
 import sys
 import numpy as np
 import time
+import warnings
+
+warnings.filterwarnings('ignore')
+
 class calendar(Process):
     def __init__(self, date_queue, lock, production, announcement_time, process_num):
         Process.__init__(self)
@@ -107,7 +111,7 @@ class calendar(Process):
             df['Time Reported'] = date_reported_df['Time Reported']
 
             if self.production == True:
-                print('asdfadfs',df)
+                print(df)
 
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
             first_ticker = self.get_first_ticker()
@@ -126,6 +130,8 @@ class calendar(Process):
         if self.production==True:
             eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" >= "%s"' % self.start_date.strftime('%Y-%m-%d'), self.conn)
             revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" >= "%s"' % self.start_date.strftime('%Y-%m-%d'), self.conn)
+            eps_df = eps_df[eps_df['Time Reported'].str.contains(self.announcement_time)]
+            revenue_df = revenue_df[revenue_df['Time Reported'].str.contains(self.announcement_time)]
         else:
             eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
             revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
