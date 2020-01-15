@@ -202,7 +202,9 @@ def aggregator(symbol):
     print((time.time()-start_time)*2921)
 
 if __name__ == '__main__':
-
+    production = False
+    if production in sys.argv:
+        production = True
 
     conn = sqlite3.connect('earnings.db', timeout=120)
     cur = conn.cursor()
