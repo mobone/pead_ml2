@@ -39,6 +39,7 @@ class calendar(Process):
         self.cur = self.conn.cursor()
         while self.date_queue.qsize()>0:
             self.start_date, self.end_date = self.date_queue.get(timeout=3)
+
             self.get_estimize_data('EPS')
             self.get_estimize_data('Revenue')
 
@@ -50,29 +51,44 @@ class calendar(Process):
 
     def get_estimize_data(self, announcement_type):
         print('Process Num', self.process_num, 'starting to gather', announcement_type, self.start_date.strftime('%Y-%m-%d'))
+        max_page_num = 1000
+        page_num = 1
 
-        # request the estimize website for data
-        if announcement_type == 'EPS':
-            url = 'https://www.estimize.com/calendar?tab=equity&startDate=%s&endDate=%s' % (self.start_date.strftime('%Y-%m-%d'), self.end_date.strftime('%Y-%m-%d'))
-        elif announcement_type == 'Revenue':
-            url = 'https://www.estimize.com/calendar?tab=equity&metric=revenue&startDate=%s&endDate=%s' % (self.start_date.strftime('%Y-%m-%d'), self.end_date.strftime('%Y-%m-%d'))
-        self.driver.get(url)
-
-        previous_first_ticker = ''
-        while True:
+        while page_num<=max_page_num:
             self.start_time = time.time()
+            # request the estimize website for data
+            if announcement_type == 'EPS':
+                url = 'https://www.estimize.com/calendar?page=%s&tab=equity&startDate=%s&endDate=%s' % (page_num, self.start_date.strftime('%Y-%m-%d'), self.end_date.strftime('%Y-%m-%d'))
+            elif announcement_type == 'Revenue':
+                url = 'https://www.estimize.com/calendar?page=%s&tab=equity&metric=revenue&startDate=%s&endDate=%s' % (page_num, self.start_date.strftime('%Y-%m-%d'), self.end_date.strftime('%Y-%m-%d'))
+
+            self.driver.get(url)
+            page_num = page_num + 1
+
+            if max_page_num == 1000:
+                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'eicEMB')))
+                elements = self.driver.find_elements_by_class_name('eicEMB')
+
+                for i in range(len(elements)):
+                    if elements[i].text == 'Next':
+                        max_page_num = int(elements[i-1].text)
+
+            if self.process_num==1:
+                progress = (page_num-1)/float(max_page_num)
+                print('Progress:', round(progress, 2), page_num-1, max_page_num, round(time.time()-self.start_time, 2))
             # check if there are no companies reporting earnings
             WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'dAViVi')))
             companies_reporting_div = self.driver.find_element_by_class_name('dAViVi')
             if '0 Events' == companies_reporting_div.text.split('\n')[1]:
                 print('no events found')
                 return
-
+            """
             first_ticker = self.get_first_ticker()
             while first_ticker == previous_first_ticker:
                 first_ticker = self.get_first_ticker()
                 sleep(.1)
             previous_first_ticker = first_ticker
+            """
 
             # method to extra the ticker symbols from the webpage
             tickers = self.get_tickers()
@@ -89,30 +105,10 @@ class calendar(Process):
             df['Date Reported'] = date_reported_df['Date Reported']
             df['Time Reported'] = date_reported_df['Time Reported']
 
+
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
             if self.testing == True:
                 break
-            try:
-                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'eicEMB')))
-                elements = self.driver.find_elements_by_class_name('eicEMB')
-                if self.process_num == 1:
-                    self.get_progress(elements)
-                for element in elements:
-                    if element.text == 'Next':
-                        self.driver.execute_script("arguments[0].click();", element)
-            except Exception as e:
-                print("Couldn't find next link")
-                print(e)
-                break
-
-    def get_progress(self, elements):
-        try:
-            page_num = int(elements[2].text)-3
-            if page_num>0:
-                print('Complete:', round(page_num/80.0,2), 'Page Num:', page_num, 'Seconds:', round(time.time()-self.start_time , 1))
-        except Exception as e:
-            print('meow', e)
-            pass
 
 
     def get_combined_df(self):
@@ -213,13 +209,13 @@ if __name__ == '__main__':
     if production == True:
         num_processes = 1
     else:
-        num_processes = 7
+        num_processes = 8
     # start the program
     processes = []
     for i in range(num_processes):
         p = calendar(date_queue, lock, production, i+1)
         p.start()
-        sleep(5)
+
 
     while date_queue.qsize()>0 or processes_running:
         sleep(15)

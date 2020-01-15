@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 import yfinance as yf
+from datetime import datetime
 
 class yahoo_gather():
     def __init__(self):
@@ -19,7 +20,7 @@ class yahoo_gather():
     def get_yahoo_historical(self):
 
         # query yahoo finance for the historical data
-        data = yf.download(self.symbols, start="2012-01-01", end="2019-12-31", group_by = 'ticker', auto_adjust = False)
+        data = yf.download(self.symbols, start="2013-01-01", end=datetime.now().strptime('%Y-%m-%d'), group_by = 'ticker', auto_adjust = False)
 
         # TODO: Make this not iterative
         for symbol in data.columns:
