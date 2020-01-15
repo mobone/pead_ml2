@@ -14,6 +14,7 @@ class yahoo_gather():
         symbols_df = pd.read_sql('select DISTINCT symbol from estimize_eps', self.conn)
         self.symbols = symbols_df['Symbol'].tolist()
         self.symbols.append('SPY')
+        self.symbols.append('DJI')
 
 
 
@@ -34,4 +35,5 @@ class yahoo_gather():
                 # store in the database
                 df.to_sql('price_history', self.conn, if_exists='append')
 
+# TODO: add production mode to gather history daily
 yahoo_gather()
