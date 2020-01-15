@@ -9,7 +9,7 @@ import requests as r
 from bs4 import BeautifulSoup
 import requests_cache
 import warnings
-
+import sys
 requests_cache.install_cache('finviz_cache')
 
 warnings.filterwarnings('ignore')
@@ -75,27 +75,28 @@ def aggregator(symbol):
 
             try:
                 if 'BMO' in time_reported:
-                    percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
+                    percent_change = history_df[history_df['Date'] == date_reported]['Open to Close 5 Days'].values[0]
                     spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 5 Days'].values[0]
                     df.loc[index_num, ['5 Day Change']] = percent_change
                     df.loc[index_num, ['5 Day Change Abnormal']] = percent_change - spy_percent_change
 
-                    percent_change = this_history[this_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
+                    percent_change = history_df[history_df['Date'] == date_reported]['Open to Close 10 Days'].values[0]
                     spy_percent_change = spy_history[spy_history['Date'] == date_reported]['Open to Close 10 Days'].values[0]
                     df.loc[index_num, ['10 Day Change']] = percent_change
                     df.loc[index_num, ['10 Day Change Abnormal']] = percent_change - spy_percent_change
                 else:
-                    percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
+                    percent_change = history_df[history_df['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
                     spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 5 Days'].head(1).values[0]
                     df.loc[index_num, ['5 Day Change']] = percent_change
                     df.loc[index_num, ['5 Day Change Abnormal']] = percent_change - spy_percent_change
 
-                    percent_change = this_history[this_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
+                    percent_change = history_df[history_df['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
                     spy_percent_change = spy_history[spy_history['Date'] > date_reported]['Open to Close 10 Days'].head(1).values[0]
                     df.loc[index_num, ['10 Day Change']] = percent_change
                     df.loc[index_num, ['10 Day Change Abnormal']] = percent_change - spy_percent_change
-            except Exception as e:
+            except:
                 pass
+
 
 
     def get_historical_beat():
@@ -197,24 +198,35 @@ def aggregator(symbol):
     get_YoY_growth()
     get_price_changes(df, history_df, spy_history_df)
     get_average_change()
+    if production == True:
+        #df = df.tail(1)
+        df = df.iloc[df.index.get_level_values('Date Reported') == datetime.now().strftime('%Y-%m-%d') + ' 00:00:00']
+        print(df)
 
     df.to_sql('aggregated_data', conn, if_exists='append')
     print((time.time()-start_time)*2921)
 
 if __name__ == '__main__':
     production = False
-    if production in sys.argv:
+    announcement_time = None
+    if 'production' in sys.argv:
         production = True
+        announcement_time = sys.argv[2]
 
     conn = sqlite3.connect('earnings.db', timeout=120)
     cur = conn.cursor()
-    symbols = pd.read_sql('select DISTINCT symbol from estimize_eps;', conn)
+    if production == True:
+        date_reported = datetime.now().strftime('%Y-%m-%d')
+        symbols = pd.read_sql('select DISTINCT symbol from estimize_eps where "Date Reported">="%s";' % date_reported, conn)
+    else:
+        symbols = pd.read_sql('select DISTINCT symbol from estimize_eps;', conn)
     symbols = symbols.values.tolist()
-    try:
-        query = 'drop table aggregated_data'
-        cur.execute(query)
-    except:
-        pass
+    if production == False:
+        try:
+            query = 'drop table aggregated_data'
+            cur.execute(query)
+        except:
+            pass
 
     for symbol in symbols:
         aggregator(symbol[0])

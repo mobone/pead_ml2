@@ -23,7 +23,7 @@ class calendar(Process):
         Process.__init__(self)
         self.date_queue = date_queue
         self.lock = lock
-        self.production = True
+        self.production = production
         self.testing = False
         self.process_num = process_num
         self.announcement_time = announcement_time
@@ -45,7 +45,8 @@ class calendar(Process):
             self.get_estimize_data('Revenue')
 
             df = self.get_combined_df()
-            print('Output df', df)
+            if self.production == True:
+                print('Output df', df)
             # store in the database
             df.to_sql('estimize_data', self.conn, if_exists='append', index=True)
 
@@ -105,7 +106,8 @@ class calendar(Process):
             df['Date Reported'] = date_reported_df['Date Reported']
             df['Time Reported'] = date_reported_df['Time Reported']
 
-            print(df)
+            if self.production == True:
+                print('asdfadfs',df)
 
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
             first_ticker = self.get_first_ticker()

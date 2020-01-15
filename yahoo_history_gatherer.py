@@ -20,7 +20,7 @@ class yahoo_gather():
     def get_yahoo_historical(self):
 
         # query yahoo finance for the historical data
-        data = yf.download(self.symbols, start="2013-01-01", end=datetime.now().strptime('%Y-%m-%d'), group_by = 'ticker', auto_adjust = False)
+        data = yf.download(self.symbols, start="2013-01-01", end=datetime.now().strftime('%Y-%m-%d'), group_by = 'ticker', auto_adjust = False)
 
         # TODO: Make this not iterative
         for symbol in data.columns:
@@ -28,7 +28,7 @@ class yahoo_gather():
                 symbol = symbol[0]
                 df = data[symbol]
                 df['Symbol'] = symbol
-                df = df.dropna()
+
                 print(df)
 
                 # store in the database
