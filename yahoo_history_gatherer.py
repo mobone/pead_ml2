@@ -28,7 +28,7 @@ class yahoo_gather():
                 symbol = symbol[0]
                 df = data[symbol]
                 df['Symbol'] = symbol
-
+                df = df.dropna()
                 print(df)
 
                 # store in the database
