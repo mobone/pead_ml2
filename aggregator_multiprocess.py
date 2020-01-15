@@ -30,7 +30,7 @@ total_eps_df = total_eps_df.replace('–', np.nan)
 
 #total_revenue_df = total_revenue_df.applymap(lambda x: re.sub(r'^-$', str(np.NaN), x))
 
-
+# TODO: drop duplicates
 spy_history_df = pd.read_sql('select * from price_history where Symbol == "%s"' % 'SPY', conn)
 
 

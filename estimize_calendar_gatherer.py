@@ -33,7 +33,7 @@ class calendar(Process):
         chrome_options.add_argument("--headless")
         chrome_options.add_argument('log-level=3')
         self.driver = webdriver.Chrome(options=chrome_options)
-        self.delay = 30
+        self.delay = 10
 
         self.conn = sqlite3.connect('earnings.db', timeout=120)
         self.cur = self.conn.cursor()
@@ -53,7 +53,7 @@ class calendar(Process):
         print('Process Num', self.process_num, 'starting to gather', announcement_type, self.start_date.strftime('%Y-%m-%d'))
         max_page_num = 1000
         page_num = 1
-
+        previous_first_ticker = ''
         while page_num<=max_page_num:
             self.start_time = time.time()
             # request the estimize website for data
@@ -66,12 +66,15 @@ class calendar(Process):
             page_num = page_num + 1
 
             if max_page_num == 1000:
-                WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'eicEMB')))
-                elements = self.driver.find_elements_by_class_name('eicEMB')
+                try:
+                    WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'eicEMB')))
+                    elements = self.driver.find_elements_by_class_name('eicEMB')
 
-                for i in range(len(elements)):
-                    if elements[i].text == 'Next':
-                        max_page_num = int(elements[i-1].text)
+                    for i in range(len(elements)):
+                        if elements[i].text == 'Next':
+                            max_page_num = int(elements[i-1].text)
+                except:
+                    pass
 
             if self.process_num==1:
                 progress = (page_num-1)/float(max_page_num)
@@ -82,21 +85,24 @@ class calendar(Process):
             if '0 Events' == companies_reporting_div.text.split('\n')[1]:
                 print('no events found')
                 return
-            """
-            first_ticker = self.get_first_ticker()
-            while first_ticker == previous_first_ticker:
-                first_ticker = self.get_first_ticker()
-                sleep(.1)
-            previous_first_ticker = first_ticker
-            """
+
 
             # method to extra the ticker symbols from the webpage
             tickers = self.get_tickers()
+            try:
+                df = pd.read_html(self.driver.page_source)[0]
+            except Exception as e:
+                return
 
-            df = pd.read_html(self.driver.page_source)[0]
             df['Symbol'] = tickers
-            df = df.iloc[:, [2,3,5,6,7,8,9,10,12]]
-            df.columns = ['Date Reported', 'Num of Estimates', 'Delta', 'Surprise', 'Historical Beat Rate', 'Wall St', 'Estimize', 'Actual', 'Symbol']
+            df = df.iloc[:, [2,3,5,6,8,9,10,12]]
+            df.columns = ['Date Reported', 'Num of Estimates', 'Delta', 'Surprise', 'Wall St', 'Estimize', 'Actual', 'Symbol']
+
+            df = df.replace('–', np.nan)
+            df = df.dropna(subset=['Surprise'])
+            if len(df)==0:
+                print('Completed ', announcement_type, self.process_num )
+                break
 
             date_reported_df = df['Date Reported'].str.split(' ', n = 1, expand = True)
             date_reported_df = date_reported_df.rename(columns={0:"Date Reported", 1:"Time Reported"})
@@ -106,7 +112,15 @@ class calendar(Process):
             df['Time Reported'] = date_reported_df['Time Reported']
 
 
+
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
+            first_ticker = self.get_first_ticker()
+            if first_ticker == previous_first_ticker:
+                print('Tickers are the same. Returning.')
+                break
+
+            previous_first_ticker = first_ticker
+
             if self.testing == True:
                 break
 
@@ -114,12 +128,8 @@ class calendar(Process):
     def get_combined_df(self):
         year = self.start_date.strftime('%y')
         print(self.start_date, self.end_date)
-        eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" < "%s" and "Date Reported" > "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
-        revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" < "%s" and "Date Reported" > "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
-
-
-        del eps_df['Historical Beat Rate']
-        del revenue_df['Historical Beat Rate']
+        eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
+        revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
 
         eps_df = eps_df.sort_values(by='Date Reported')
         revenue_df = revenue_df.sort_values(by='Date Reported')
@@ -131,9 +141,6 @@ class calendar(Process):
         revenue_df.columns = 'Revenue ' + revenue_df.columns
 
         df = eps_df.join(revenue_df)
-
-        df = df.replace('–', np.nan)
-        df = df.replace([np.inf, -np.inf], np.nan)
 
         return df
 
@@ -215,6 +222,7 @@ if __name__ == '__main__':
     for i in range(num_processes):
         p = calendar(date_queue, lock, production, i+1)
         p.start()
+        sleep(5)
 
 
     while date_queue.qsize()>0 or processes_running:
