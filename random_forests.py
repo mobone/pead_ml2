@@ -10,6 +10,61 @@ import random
 warnings.filterwarnings('ignore')
 pd.set_option('display.max_rows', 1000)
 
+class perform_ml():
+    def __init__(self, df, buy_cutoff):
+        self.df = df
+        self.buy_cutoff = buy_cutoff
+        self.features = list(self.df.columns)
+        self.features.remove('5 Day Change')
+        self.features.remove('10 Day Change')
+        self.features.remove('5 Day Change Abnormal')
+        self.features.remove('10 Day Change Abnormal')
+        print(self.features)
+        self.prepare_data()
+        for self.machine in ['Classifier', 'Regressor']:
+            self.train()
+            self.predict()
+            self.get_results()
+
+    def prepare_data(self):
+        self.df['is_train'] = True
+        #self.df['is_train'] = np.random.uniform(0, 1, len(self.df)) <= .75
+        self.df['is_train'].values[self.df['Date Reported'] >= datetime.strptime('2019-01-01', '%Y-%m-%d')] = False
+
+        self.df['Action'] = 'Buy'
+        self.df['Action'].values[self.df['10 Day Change Abnormal'].values > self.buy_cutoff] = "Don't Buy"
+        self.df['Action'] = self.df['Action'].astype('category')
+
+        self.train, self.test = df[df['is_train']==True], df[df['is_train']==False]
+
+    def train(self):
+        if self.machine == 'Classifier':
+            self.clf = RandomForestClassifier(n_jobs=-1)
+            y, _ = pd.factorize(self.train['Action'])
+            self.clf.fit(self.train[self.features], y)
+        elif self.machine == 'Regressor':
+            self.clf = RandomForestRegressor(n_jobs=-1)
+            y = self.train['10 Day Change Abnormal']
+            self.clf.fit(self.train[self.features], y)
+
+    def predict(self):
+        preds = self.clf.predict(self.test[features])
+        self.test[self.machine + ' Predicted'] = preds
+
+
+    def get_results(self):
+        # View a list of the features and their importance scores
+        feature_imp = pd.Series(self.clf.feature_importances_,index=self.features).sort_values(ascending=False)
+
+        chosen = self.test[self.test['Predicted']==1]
+        actual_winners = chosen[chosen['10 Day Change Abnormal'] > .0]
+        accuracy = metrics.accuracy_score(self.test['Action'], self.test['Predicted'])
+        profitable_percent = len(actual_winners)/float(len(chosen))
+        mean_return = round(chosen['10 Day Change'].mean()*100,2)
+
+        print(feature_imp)
+        print(chosen, actual_winners, accuracy, profitable_percent, mean_return)
+
 conn = sqlite3.connect('earnings.db', timeout=120)
 df = pd.read_sql('select * from aggregated_data', conn, parse_dates = ['Date Reported'])
 
@@ -21,55 +76,8 @@ max_accuracy = 0
 max_correct = 0
 max_mean_return = 0
 
-class ml():
-    def __init__(self, df, buy_cutoff):
-        features = ['EPS Num of Estimates', 'EPS Delta', 'EPS Surprise', 'EPS Wall St',
-               'EPS Estimize', 'EPS Actual', 'Revenue Num of Estimates',
-               'Revenue Delta', 'Revenue Surprise', 'Revenue Wall St',
-               'Revenue Estimize', 'Revenue Actual',
-               'Historical EPS Beat Ratio', 'Historical EPS Beat Percent',
-               'Average Change 5 Days', 'Average Abnormal Change 5 Days', 'Average Change 10 Days', 'Average Abnormal Change 10 Days',
-               'YoY Growth']
+perform_ml(df, .05)
 
-        train, test = self.prepare_data(df, buy_cutoff)
-        self.train(train, features)
-        self.predict(test, features)
-        self.get_results(test)
-
-    def prepare_data(self, df, buy_cutoff):
-        df['is_train'] = True
-        #df['is_train'] = np.random.uniform(0, 1, len(df)) <= .75
-        df['is_train'].values[df['Date Reported'] >=datetime.strptime('2019-01-01', '%Y-%m-%d')] = False
-
-        df['Action'] = 'Buy'
-        df['Action'].values[df['10 Day Change Abnormal'].values > buy_cutoff] = "Don't Buy"
-        df['Action'] = df['Action'].astype('category')
-
-        train, test = df[df['is_train']==True], df[df['is_train']==False]
-
-        return train, test
-
-    def train(self, train, features):
-        self.clf = RandomForestClassifier(n_jobs=-1)
-        y, _ = pd.factorize(train['Action'])
-        clf.fit(train[features], y)
-
-    def predict(self, test, features):
-        preds = self.clf.predict(test[features])
-        test['Predicted'] = preds
-
-    def get_results(self, test):
-        # View a list of the features and their importance scores
-        feature_imp = pd.Series(self.clf.feature_importances_,index=features).sort_values(ascending=False)
-
-        chosen = test[test['Predicted']==1]
-        actual_winners = chosen[chosen['10 Day Change Abnormal'] > .0]
-        accuracy = metrics.accuracy_score(test['Action'], test['Predicted'])
-        profitable_percent = len(actual_winners)/float(len(chosen))
-        mean_return = round(chosen['10 Day Change'].mean()*100,2)
-
-        print(feature_imp)
-        print(chosen, actual_winners, accuracy, profitable_percent, mean_return)
 """
 if (accuracy > max_accuracy or correct > max_correct) and mean_return>max_mean_return:
     max_mean_return = mean_return
@@ -86,4 +94,3 @@ if (accuracy > max_accuracy or correct > max_correct) and mean_return>max_mean_r
     print("Accuracy:", round(accuracy,2), "Correct Accuracy:", round(correct,2),"Mean Return:", mean_return, "Trades:", len(chosen), "Actual Winners:", len(actual_winners), 'Buy Cutoff:', buy_cutoff)
     print(pd.crosstab(test['Action'], preds, rownames=['actual'], colnames=['preds']))
 """
-ml(df, .05)
