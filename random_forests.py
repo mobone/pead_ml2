@@ -13,8 +13,7 @@ pd.set_option('display.max_rows', 1000)
 conn = sqlite3.connect('earnings.db', timeout=120)
 df = pd.read_sql('select * from aggregated_data', conn, parse_dates = ['Date Reported'])
 
-df = df.replace('–', np.nan)
-df = df.replace([np.inf, -np.inf], np.nan)
+
 df = df.dropna() #TODO: Deal with nan's
 df = df.sort_values(by='Date Reported')
 print(df)

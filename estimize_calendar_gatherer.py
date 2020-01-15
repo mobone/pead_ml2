@@ -19,13 +19,14 @@ import sys
 import numpy as np
 import time
 class calendar(Process):
-    def __init__(self, date_queue, lock, production, process_num):
+    def __init__(self, date_queue, lock, production, announcement_time, process_num):
         Process.__init__(self)
         self.date_queue = date_queue
         self.lock = lock
         self.production = True
         self.testing = False
         self.process_num = process_num
+        self.announcement_time = announcement_time
 
 
     def run(self):
@@ -40,8 +41,8 @@ class calendar(Process):
         while self.date_queue.qsize()>0:
             self.start_date, self.end_date = self.date_queue.get(timeout=3)
 
-            #self.get_estimize_data('EPS')
-            #self.get_estimize_data('Revenue')
+            self.get_estimize_data('EPS')
+            self.get_estimize_data('Revenue')
 
             df = self.get_combined_df()
             print('Output df', df)
@@ -80,8 +81,6 @@ class calendar(Process):
                 progress = (page_num-1)/float(max_page_num)
                 print('Progress:', round(progress, 2), page_num-1, max_page_num, round(time.time()-self.start_time, 2))
 
-
-
             # method to extra the ticker symbols from the webpage
             tickers = self.get_tickers()
             try:
@@ -92,6 +91,12 @@ class calendar(Process):
             df['Symbol'] = tickers
             df = df.iloc[:, [2,3,5,6,8,9,10,12]]
             df.columns = ['Date Reported', 'Num of Estimates', 'Delta', 'Surprise', 'Wall St', 'Estimize', 'Actual', 'Symbol']
+            if self.production == True and self.announcement_time is not None:
+                df = df[df['Date Reported'].str.contains(self.announcement_time)]
+
+
+            if len(df)==0:
+                break
 
             date_reported_df = df['Date Reported'].str.split(' ', n = 1, expand = True)
             date_reported_df = date_reported_df.rename(columns={0:"Date Reported", 1:"Time Reported"})
@@ -99,6 +104,8 @@ class calendar(Process):
 
             df['Date Reported'] = date_reported_df['Date Reported']
             df['Time Reported'] = date_reported_df['Time Reported']
+
+            print(df)
 
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
             first_ticker = self.get_first_ticker()
@@ -114,9 +121,12 @@ class calendar(Process):
 
     def get_combined_df(self):
         year = self.start_date.strftime('%y')
-
-        eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
-        revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
+        if self.production==True:
+            eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" >= "%s"' % self.start_date.strftime('%Y-%m-%d'), self.conn)
+            revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" >= "%s"' % self.start_date.strftime('%Y-%m-%d'), self.conn)
+        else:
+            eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
+            revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
 
 
         eps_df = eps_df.sort_values(by='Date Reported')
@@ -166,7 +176,10 @@ def drop_table(table_name):
 
 
 if __name__ == '__main__':
+    announcement_time = None
     if 'production' in sys.argv:
+        # TODO: Make args better
+        announcement_time = sys.argv[2]
         production = True
         print('Running in production mode.')
     else:
@@ -196,7 +209,7 @@ if __name__ == '__main__':
         date_list.append((datetime.strptime('2017-01-01', '%Y-%m-%d'), datetime.strptime('2017-12-31', '%Y-%m-%d')))
         date_list.append((datetime.strptime('2018-01-01', '%Y-%m-%d'), datetime.strptime('2018-12-31', '%Y-%m-%d')))
         date_list.append((datetime.strptime('2019-01-01', '%Y-%m-%d'), datetime.strptime('2019-12-31', '%Y-%m-%d')))
-        date_list.append((datetime.strptime('2020-01-01', '%Y-%m-%d'), datetime.now()))
+        date_list.append((datetime.strptime('2020-01-01', '%Y-%m-%d'), datetime.now()-timedelta(days=1)))
 
 
 
@@ -211,11 +224,11 @@ if __name__ == '__main__':
     # start the program
     processes = []
     for i in range(num_processes):
-        p = calendar(date_queue, lock, production, i+1)
+        p = calendar(date_queue, lock, production, announcement_time, i+1)
         p.start()
         sleep(5)
 
-
+    processes_running = True
     while date_queue.qsize()>0 or processes_running:
         sleep(15)
         #print(date_queue.qsize())
