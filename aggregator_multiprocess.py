@@ -37,21 +37,6 @@ spy_history_df = pd.read_sql('select * from price_history where Symbol == "%s"' 
 #@multitasking.task
 def aggregator(symbol):
     def get_combined_df(eps_df, revenue_df):
-        del eps_df['Historical Beat Rate']
-        del revenue_df['Historical Beat Rate']
-
-        date_reported_df = eps_df['Date Reported'].str.split(' ', n = 1, expand = True)
-        date_reported_df = date_reported_df.rename(columns={0:"Date Reported", 1:"Time Reported"})
-        date_reported_df['Date Reported'] = pd.to_datetime(date_reported_df['Date Reported'])
-        eps_df['Date Reported'] = date_reported_df['Date Reported']
-        eps_df['Time Reported'] = date_reported_df['Time Reported']
-
-        date_reported_df = revenue_df['Date Reported'].str.split(' ', n = 1, expand = True)
-        date_reported_df = date_reported_df.rename(columns={0:"Date Reported", 1:"Time Reported"})
-        date_reported_df['Date Reported'] = pd.to_datetime(date_reported_df['Date Reported'])
-        revenue_df['Date Reported'] = date_reported_df['Date Reported']
-        revenue_df['Time Reported'] = date_reported_df['Time Reported']
-
         eps_df = eps_df.sort_values(by='Date Reported')
         revenue_df = revenue_df.sort_values(by='Date Reported')
 
@@ -170,7 +155,10 @@ def aggregator(symbol):
         finviz_page = r.get('https://finviz.com/quote.ashx?t=%s' % symbol)
 
         soup = BeautifulSoup(finviz_page.text, features='lxml')
-        table_row = soup.findAll('tr', attrs={'class': "table-dark-row"})[1]
+        try:
+            table_row = soup.findAll('tr', attrs={'class': "table-dark-row"})[1]
+        except:
+            return
         market_cap = table_row.text.replace('Market Cap','').split('\n')[1]
         if 'K' in market_cap:
             market_cap = float(market_cap[:-1])*1000
