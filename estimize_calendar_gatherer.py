@@ -40,8 +40,8 @@ class calendar(Process):
         while self.date_queue.qsize()>0:
             self.start_date, self.end_date = self.date_queue.get(timeout=3)
 
-            self.get_estimize_data('EPS')
-            self.get_estimize_data('Revenue')
+            #self.get_estimize_data('EPS')
+            #self.get_estimize_data('Revenue')
 
             df = self.get_combined_df()
             print('Output df', df)
@@ -79,12 +79,7 @@ class calendar(Process):
             if self.process_num==1:
                 progress = (page_num-1)/float(max_page_num)
                 print('Progress:', round(progress, 2), page_num-1, max_page_num, round(time.time()-self.start_time, 2))
-            # check if there are no companies reporting earnings
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'dAViVi')))
-            companies_reporting_div = self.driver.find_element_by_class_name('dAViVi')
-            if '0 Events' == companies_reporting_div.text.split('\n')[1]:
-                print('no events found')
-                return
+
 
 
             # method to extra the ticker symbols from the webpage
@@ -98,20 +93,12 @@ class calendar(Process):
             df = df.iloc[:, [2,3,5,6,8,9,10,12]]
             df.columns = ['Date Reported', 'Num of Estimates', 'Delta', 'Surprise', 'Wall St', 'Estimize', 'Actual', 'Symbol']
 
-            df = df.replace('–', np.nan)
-            df = df.dropna(subset=['Surprise'])
-            if len(df)==0:
-                print('Completed ', announcement_type, self.process_num )
-                break
-
             date_reported_df = df['Date Reported'].str.split(' ', n = 1, expand = True)
             date_reported_df = date_reported_df.rename(columns={0:"Date Reported", 1:"Time Reported"})
             date_reported_df['Date Reported'] = pd.to_datetime(date_reported_df['Date Reported'])
 
             df['Date Reported'] = date_reported_df['Date Reported']
             df['Time Reported'] = date_reported_df['Time Reported']
-
-
 
             df.to_sql('estimize_%s' % announcement_type, self.conn, if_exists='append', index=False)
             first_ticker = self.get_first_ticker()
@@ -127,15 +114,16 @@ class calendar(Process):
 
     def get_combined_df(self):
         year = self.start_date.strftime('%y')
-        print(self.start_date, self.end_date)
+
         eps_df = pd.read_sql('select * from estimize_EPS where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
         revenue_df = pd.read_sql('select * from estimize_Revenue where "Date Reported" <= "%s" and "Date Reported" >= "%s"' % (self.end_date.strftime('%Y-%m-%d'), self.start_date.strftime('%Y-%m-%d')), self.conn)
+
 
         eps_df = eps_df.sort_values(by='Date Reported')
         revenue_df = revenue_df.sort_values(by='Date Reported')
 
-        eps_df = eps_df.set_index(['Date Reported', 'Time Reported', 'Symbol'], append=True, drop = True)
-        revenue_df = revenue_df.set_index(['Date Reported', 'Time Reported', 'Symbol'], append=True, drop = True)
+        eps_df = eps_df.set_index(['Date Reported', 'Symbol'], drop = True)
+        revenue_df = revenue_df.set_index(['Date Reported', 'Symbol'], drop = True)
 
         eps_df.columns = 'EPS ' + eps_df.columns
         revenue_df.columns = 'Revenue ' + revenue_df.columns
@@ -146,6 +134,7 @@ class calendar(Process):
 
 
     def get_first_ticker(self):
+        WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located((By.CLASS_NAME , 'lfkTWp')))
         soup = BeautifulSoup(self.driver.page_source, features='lxml')
         ticker_links = soup.findAll('a', attrs={'class': 'lfkTWp'})
         first_ticker = ticker_links[0].contents[0]
@@ -209,6 +198,8 @@ if __name__ == '__main__':
         date_list.append((datetime.strptime('2019-01-01', '%Y-%m-%d'), datetime.strptime('2019-12-31', '%Y-%m-%d')))
         date_list.append((datetime.strptime('2020-01-01', '%Y-%m-%d'), datetime.now()))
 
+
+
     #shuffle(date_list)
     for date in date_list:
         date_queue.put(date)
@@ -216,7 +207,7 @@ if __name__ == '__main__':
     if production == True:
         num_processes = 1
     else:
-        num_processes = 8
+        num_processes = 7
     # start the program
     processes = []
     for i in range(num_processes):
