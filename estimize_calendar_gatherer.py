@@ -183,13 +183,13 @@ if __name__ == '__main__':
         date_list.append((datetime.now(), datetime.now()))
     else:
         date_list.append((datetime.strptime('2013-01-01', '%Y-%m-%d'), datetime.strptime('2014-12-01', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2014-01-01', '%Y-%m-%d'), datetime.strptime('2014-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2015-01-01', '%Y-%m-%d'), datetime.strptime('2015-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2016-01-01', '%Y-%m-%d'), datetime.strptime('2016-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2017-01-01', '%Y-%m-%d'), datetime.strptime('2017-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2018-01-01', '%Y-%m-%d'), datetime.strptime('2018-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2019-01-01', '%Y-%m-%d'), datetime.strptime('2019-12-31', '%Y-%m-%d')))
-        #date_list.append((datetime.strptime('2020-01-01', '%Y-%m-%d'), datetime.now()))
+        date_list.append((datetime.strptime('2014-01-01', '%Y-%m-%d'), datetime.strptime('2014-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2015-01-01', '%Y-%m-%d'), datetime.strptime('2015-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2016-01-01', '%Y-%m-%d'), datetime.strptime('2016-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2017-01-01', '%Y-%m-%d'), datetime.strptime('2017-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2018-01-01', '%Y-%m-%d'), datetime.strptime('2018-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2019-01-01', '%Y-%m-%d'), datetime.strptime('2019-12-31', '%Y-%m-%d')))
+        date_list.append((datetime.strptime('2020-01-01', '%Y-%m-%d'), datetime.now()))
 
     #shuffle(date_list)
     for date in date_list:
