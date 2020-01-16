@@ -98,6 +98,22 @@ def aggregator(symbol):
                 pass
 
 
+    # TODO: Add SUE and ratio
+    def get_sue(self):
+        try:
+            self.sue = np.std([float(str(self.eps).replace('$','')), float(str(self.cons).replace('$',''))])
+            #self.sue = round(self.sue,5)
+        except Exception as e:
+            # usually cannot convert from foreign currency to float
+            pass
+
+    def get_ratio(self):
+        try:
+            self.ratio = self.percent_beat_eps/self.sue
+            #self.ratio = round(self.ratio,5)
+        except Exception as e:
+            #print e
+            pass
 
     def get_historical_beat():
         df['Historical EPS Beat Ratio'] = None
