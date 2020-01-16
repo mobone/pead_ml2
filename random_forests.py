@@ -81,6 +81,13 @@ class perform_ml():
     def predict(self):
         preds = self.clf.predict(self.test[self.features])
         self.test[self.machine + ' Predicted'] = preds
+        # TODO: Possibly have machine provide probabilites as output
+        self.test['Prob 0'] = None
+        self.test['Prob 1'] = None
+        self.test[['Prob 0', 'Prob 1']] = self.clf.predict_proba(self.test[self.features])
+        # TODO: use target names, numpy nd array
+        #preds = iris.target_names[clf.predict(test[features])]
+
 
 
     def get_results(self):
