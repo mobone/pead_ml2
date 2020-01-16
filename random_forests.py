@@ -9,6 +9,7 @@ from datetime import datetime
 import random
 from itertools import combinations
 from random import randint
+from joblib import dump, load
 
 warnings.filterwarnings('ignore')
 pd.set_option('display.max_rows', 1000)
@@ -61,6 +62,16 @@ class perform_ml():
             self.features.remove('10 Day Change Abnormal')
             train = self.train[self.features]
             self.clf.fit(train[self.features], y)
+
+            # save model
+            self.output_model = RandomForestClassifier(n_jobs=-1)
+
+            y = self.df['Action Code']
+            save_train = self.df[self.features]
+            self.output_model.fit(save_train[self.features], y)
+            dump(self.output_model, 'start_at_01_15_2020.joblib')
+            input()
+
         elif self.machine == 'Regressor':
             self.clf = RandomForestRegressor(n_jobs=-1)
             y = self.train['10 Day Change Abnormal']
