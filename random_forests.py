@@ -63,14 +63,15 @@ class perform_ml():
             train = self.train[self.features]
             self.clf.fit(train[self.features], y)
 
+            """
             # save model
             self.output_model = RandomForestClassifier(n_jobs=-1)
-
             y = self.df['Action Code']
             save_train = self.df[self.features]
             self.output_model.fit(save_train[self.features], y)
             dump(self.output_model, 'start_at_01_15_2020.joblib')
             input()
+            """
 
         elif self.machine == 'Regressor':
             self.clf = RandomForestRegressor(n_jobs=-1)
