@@ -2,3 +2,4 @@
 *.log
 *.csv
 *.sqlite
+finviz_cache.sqlite
