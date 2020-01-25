@@ -21,7 +21,7 @@ class yahoo_gather():
     def get_yahoo_historical(self):
 
         # query yahoo finance for the historical data
-        data = yf.download(self.symbols, start="2013-01-01", end=datetime.now().strftime('%Y-%m-%d'), group_by = 'ticker', auto_adjust = False)
+        data = yf.download(self.symbols, start="2013-01-01", end=datetime.now().strftime('%Y-%m-%d'), group_by = 'ticker', auto_adjust = True)
 
         # TODO: Make this not iterative
         for symbol in data.columns:
@@ -33,7 +33,7 @@ class yahoo_gather():
                 print(df)
 
                 # store in the database
-                df.to_sql('price_history', self.conn, if_exists='append')
+                df.to_sql('price_history_adjusted', self.conn, if_exists='append')
 
 # TODO: add production mode to gather history daily
 yahoo_gather()

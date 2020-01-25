@@ -18,50 +18,91 @@ class perform_ml():
     def __init__(self, df):
         self.df = df
         self.out_df = None
+        self.buy_cutoff = .02
+        self.conn = sqlite3.connect('earnings.db', timeout=120)
+        self.prepare_data()
+        self.features = list(self.df.columns)
+        for remove_me in ['5 Day Change', '10 Day Change', '5 Day Change Abnormal',
+                          '10 Day Change Abnormal',
+                          'Date Reported', 'Time Reported',
+                          'Symbol', 'Market Cap Text', 'Action',
+                          'is_train']:
+            self.features.remove(remove_me)
+        for feature in self.features:
+            if "Actual" in feature:
+                self.features.remove(feature)
+        #'Before and After', 'YoY Growth','Revenue Surprise'
+        self.good_features = []
+        for good_feature in self.good_features:
+            self.features.remove(good_feature)
+
+        self.n_features = randint(0,len(self.features)-2)
+
+        self.feature_combinations = []
+        for i in range(3,len(self.features)-1):
+            for combo in list(combinations(self.features, i)):
+                self.feature_combinations.append(combo)
 
 
+        print(len(self.feature_combinations))
+        self.chosen_means = [0]
 
         while True:
-            #self.buy_cutoff =  random.uniform(.02,.09)
-            self.buy_cutoff = .06
+            self.buy_cutoff = round(random.uniform(.00,.04),3)
+            #self.buy_cutoff = .045
             self.prepare_data()
-            self.features = list(self.df.columns)
-            for remove_me in ['5 Day Change', '10 Day Change', '5 Day Change Abnormal',
-                              'Date Reported', 'Time Reported',
-                              'Symbol', 'Market Cap Text', 'Action',
-                              'is_train']:
-                self.features.remove(remove_me)
+
+
+            #self.n_features = randint(2,len(self.features)-1)
+
+
             for self.machine in ['Classifier']:
                 self.train_model()
                 self.predict()
-                self.get_results()
+                try:
+                    self.get_results()
+                except Exception as e:
+                    print(e)
+                    pass
+
+                #self.visualize()
+                #input()
 
     def prepare_data(self):
         self.df['is_train'] = True
         #self.df['is_train'] = np.random.uniform(0, 1, len(self.df)) <= .75
         self.df['is_train'].values[self.df['Date Reported'] >= datetime.strptime('2019-01-01', '%Y-%m-%d')] = False
 
-        self.df['Action'] = 'Dont Buy'
+        self.df['Action'] = 'None'
+        #self.df['Action'].values[self.df['10 Day Change Abnormal'].values < self.short_cutoff] = "Short"
         self.df['Action'].values[self.df['10 Day Change Abnormal'].values > self.buy_cutoff] = "Buy"
         #self.df['Action'].values[(self.df['10 Day Change Abnormal'].values >= self.regressor_min) & (self.df['10 Day Change Abnormal'].values <= self.regressor_max) ] = "Buy"
         self.df['Action'] = self.df['Action'].astype('category')
         self.df["Action Code"] = self.df["Action"].cat.codes
-        self.df['Market Cap Text'] = self.df['Market Cap Text'].astype('category')
-        self.df["Market Cap Code"] = self.df["Market Cap Text"].cat.codes
-        print(self.df[['Action', 'Action Code', '10 Day Change Abnormal']])
-
+        #self.df['Market Cap Text'] = self.df['Market Cap Text'].astype('category')
+        #self.df["Market Cap Code"] = self.df["Market Cap Text"].cat.codes
 
         self.train, self.test = df[df['is_train']==True], df[df['is_train']==False]
 
     def train_model(self):
         if self.machine == 'Classifier':
-            self.clf = RandomForestClassifier(n_jobs=-1)
+            self.clf = RandomForestClassifier(n_jobs=-1, n_estimators=1000)
 
             y = self.train['Action Code']
-            self.features.remove('Action Code')
-            self.features.remove('10 Day Change Abnormal')
-            train = self.train[self.features]
-            self.clf.fit(train[self.features], y)
+            #print(self.train[['10 Day Change', 'Action', 'Action Code']])
+            self.chosen_num = randint(0, len(self.feature_combinations)-1)
+            self.chosen_features = self.feature_combinations[self.chosen_num]
+            self.chosen_features = list(self.chosen_features)
+
+            for good_feature in self.good_features:
+                if good_feature not in self.chosen_features:
+                    self.chosen_features.append(good_feature)
+            self.n_features = len(self.chosen_features)
+            if 'Action Code' in self.chosen_features:
+                self.chosen_features.remove('Action Code')
+
+            train = self.train[self.chosen_features]
+            self.clf.fit(train, y)
 
             """
             # save model
@@ -79,44 +120,82 @@ class perform_ml():
             self.clf.fit(self.train[self.features], y)
 
     def predict(self):
-        preds = self.clf.predict(self.test[self.features])
-        self.test[self.machine + ' Predicted'] = preds
+        preds = self.clf.predict(self.test[self.chosen_features])
+        preds = pd.DataFrame(preds).astype(str)
+        preds.columns = ['Predicted']
+
+        preds = preds.replace('0','Buy')
+        preds = preds.replace('1','None')
+        #preds = preds.replace('2','Sell')
+
+        self.test[self.machine + ' Predicted'] = list(preds['Predicted'])
+        #self.test.to_csv('ml_results.csv')
         # TODO: Possibly have machine provide probabilites as output
+        """
         self.test['Prob 0'] = None
         self.test['Prob 1'] = None
-        self.test[['Prob 0', 'Prob 1']] = self.clf.predict_proba(self.test[self.features])
+        self.test[['Prob 0', 'Prob 1']] = self.clf.predict_proba(self.test[self.chosen_features])
+        """
         # TODO: use target names, numpy nd array
         #preds = iris.target_names[clf.predict(test[features])]
 
 
-
     def get_results(self):
         # View a list of the  and their importance scores
-        feature_imp = pd.Series(self.clf.feature_importances_,index=self.features).sort_values(ascending=False)
+        #self.test.to_csv('ml_results.csv')
+        feature_imp = pd.Series(self.clf.feature_importances_,index=self.chosen_features).sort_values(ascending=False)
 
-        chosen = self.test[self.test['Classifier Predicted']==0]
-        actual_winners = chosen[chosen['10 Day Change Abnormal'] > .0]
-        accuracy = metrics.accuracy_score(self.test['Action Code'], self.test['Classifier Predicted'])
-        profitable_percent = len(actual_winners)/float(len(chosen))
-        mean_return = round(chosen['10 Day Change'].mean()*100,2)
+        chosen = self.test[self.test['Classifier Predicted']=='Buy']
+        not_chosen = self.test[self.test['Classifier Predicted']=='None']
+        actual_winners = chosen[chosen['10 Day Change'] > .0]
+        #accuracy = round(metrics.accuracy_score(self.test['Action Code'], self.test['Classifier Predicted']),2)
+        accuracy = 0
+        profitable_percent = round(len(actual_winners)/float(len(chosen)), 2)
+        mean_return = round(chosen['10 Day Change'].mean()*100,4)
+        not_mean_return = round(not_chosen['10 Day Change'].mean()*100,4)
 
-        print(feature_imp)
+        avg_mean_total = sum(self.chosen_means)/len(self.chosen_means)
+        #if len(chosen)< 100 or mean_return<avg_mean_total:
+        #    return
+        self.chosen_means.append(mean_return)
+        #print(feature_imp)
+
+        self.chosen_features = list(feature_imp.keys())
         #print(pd.crosstab(self.test['Action'], self.test['Classifier Predicted'], rownames=['Actual Action'], colnames=['Predicted Action']))
 
         #print(chosen, actual_winners, accuracy, profitable_percent, mean_return)
-        df_row = [[self.buy_cutoff, accuracy, profitable_percent, mean_return, len(chosen)]]
-        print(df_row)
+        df_row = [[self.buy_cutoff, self.n_features, profitable_percent, mean_return, not_mean_return, len(chosen), str(self.chosen_features)]]
+        df_row = pd.DataFrame(df_row)
+        df_row.columns = ['buy cutoff', 'n_features', 'profitable percent', 'avg profit', 'avg not profit', 'num of trades', 'chosen features']
+        df_row.to_sql('ml_results', self.conn, if_exists='append')
+        """
         if self.out_df is None:
             self.out_df = pd.DataFrame(df_row)
-            print(self.out_df)
-            self.out_df.columns = ['buy cutoff', 'accuracy', 'profitable percent', 'avg profit', 'num of trades']
+
+            self.out_df.columns = ['buy cutoff', 'n_features', 'profitable percent', 'avg profit', 'avg not profit', 'num of trades', 'chosen features']
         else:
             df_row = pd.DataFrame(df_row)
-            df_row.columns = ['buy cutoff', 'accuracy', 'profitable percent', 'avg profit', 'num of trades']
+            print(df_row)
+            df_row.columns = ['buy cutoff', 'n_features', 'profitable percent', 'avg profit', 'avg not profit','num of trades', 'chosen features']
             self.out_df = self.out_df.append(df_row)
-
+        self.out_df = self.out_df.sort_values(by=['avg profit'])
         print(self.out_df)
         self.out_df.to_csv('results.csv')
+        """
+
+    def visualize(self):
+        estimator = self.clf.estimators_[5]
+        from sklearn.tree import export_graphviz
+        # Export as dot file
+        export_graphviz(estimator, out_file='tree.dot',
+                        feature_names = iris.feature_names,
+                        class_names = iris.target_names,
+                        rounded = True, proportion = False,
+                        precision = 2, filled = True)
+
+        # Convert to png using system command (requires Graphviz)
+        from subprocess import call
+        call(['dot', '-Tpng', 'tree.dot', '-o', 'tree.png', '-Gdpi=600'])
 
 
 conn = sqlite3.connect('earnings.db', timeout=120)
